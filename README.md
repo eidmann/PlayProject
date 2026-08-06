@@ -40,7 +40,7 @@ This project exists for two reasons, in this order:
 | -------- | ----------------------------------------------------------------------- |
 | Frontend | React 19, Vite, TypeScript, Redux Toolkit, React Router                 |
 | Backend  | Node.js, Express, TypeScript, Zod (validation)                          |
-| Database | PostgreSQL (Docker Compose) via Prisma ORM                              |
+| Database | PostgreSQL (Neon cloud, free tier) via Prisma ORM                       |
 | AI       | OpenAI API (summaries, mood analysis, insights)                         |
 | Testing  | Vitest + React Testing Library (frontend), Vitest + Supertest (backend) |
 | Quality  | ESLint, Prettier, Husky pre-commit hooks, GitHub Actions CI             |
@@ -55,7 +55,6 @@ This project exists for two reasons, in this order:
 │   ├── WORKFLOW.md        ← the daily development loop (branch → TDD → review → commit)
 │   └── CURSOR_GUIDE.md    ← how to use Cursor professionally in this repo
 ├── .cursor/rules/         ← rules that enforce the mentor behavior and code standards
-├── docker-compose.yml     ← local PostgreSQL
 ├── .github/workflows/     ← CI: lint, typecheck, test on every push
 ├── frontend/              ← React app (npm workspace)
 └── backend/               ← Express API (npm workspace)
@@ -71,11 +70,11 @@ nvm use
 # 1. Install all dependencies (root, frontend, backend — npm workspaces)
 npm install
 
-# 2. Start PostgreSQL
-docker compose up -d
+# 2. Create a free PostgreSQL database at https://neon.tech
+#    (sign up, create a project named "mindlog", copy the connection strings)
 
 # 3. Set up backend environment
-cp backend/.env.example backend/.env   # then fill in values
+cp backend/.env.example backend/.env   # then paste the Neon connection strings
 
 # 4. Apply database migrations
 npm run db:migrate
@@ -86,16 +85,16 @@ npm run dev          # starts backend (:3001) and frontend (:5173) together
 
 ## Commands (run from repo root)
 
-| Command                | What it does                                 |
-| ---------------------- | -------------------------------------------- |
-| `npm run dev`          | Start backend and frontend dev servers       |
-| `npm test`             | Run all tests (backend + frontend)           |
-| `npm run lint`         | Lint all code                                |
-| `npm run typecheck`    | TypeScript strict check, both packages       |
-| `npm run format`       | Format all code with Prettier                |
-| `npm run format:check` | Verify formatting without writing            |
-| `npm run db:migrate`   | Run Prisma migrations against local Postgres |
-| `npm run db:studio`    | Open Prisma Studio to browse the database    |
+| Command                | What it does                               |
+| ---------------------- | ------------------------------------------ |
+| `npm run dev`          | Start backend and frontend dev servers     |
+| `npm test`             | Run all tests (backend + frontend)         |
+| `npm run lint`         | Lint all code                              |
+| `npm run typecheck`    | TypeScript strict check, both packages     |
+| `npm run format`       | Format all code with Prettier              |
+| `npm run format:check` | Verify formatting without writing          |
+| `npm run db:migrate`   | Run Prisma migrations against the database |
+| `npm run db:studio`    | Open Prisma Studio to browse the database  |
 
 ## Current state
 
