@@ -38,7 +38,7 @@ This project exists for two reasons, in this order:
 
 | Layer    | Choice                                                                  |
 | -------- | ----------------------------------------------------------------------- |
-| Frontend | React 18, Vite, TypeScript, Redux Toolkit, React Router                 |
+| Frontend | React 19, Vite, TypeScript, Redux Toolkit, React Router                 |
 | Backend  | Node.js, Express, TypeScript, Zod (validation)                          |
 | Database | PostgreSQL (Docker Compose) via Prisma ORM                              |
 | AI       | OpenAI API (summaries, mood analysis, insights)                         |
@@ -65,6 +65,9 @@ This project exists for two reasons, in this order:
 ## Getting started
 
 ```bash
+# 0. Use the right Node version (22, pinned in .nvmrc)
+nvm use
+
 # 1. Install all dependencies (root, frontend, backend — npm workspaces)
 npm install
 
