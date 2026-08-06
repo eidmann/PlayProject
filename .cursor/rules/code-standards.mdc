@@ -1,0 +1,36 @@
+---
+description: Engineering standards for all code in this repository
+alwaysApply: true
+---
+
+# Code Standards
+
+Professional quality, no shortcuts. These apply to all code, whoever writes it.
+
+## TypeScript
+
+- Strict mode is on and stays on. No `any`, no `@ts-ignore`, no `as` casts to silence errors. Use `unknown` + narrowing for untrusted data.
+- Infer types where obvious; annotate public function signatures and API boundaries.
+
+## Validation and errors
+
+- Validate all external input (request bodies, query params, third-party API responses) with Zod at the boundary. Never pass unvalidated data to Prisma or business logic.
+- No swallowed errors. Every `catch` either handles meaningfully or rethrows with context.
+- API errors: correct status codes (400 validation, 404 missing, 500 unexpected) with a JSON body `{ "error": string }`.
+
+## Testing
+
+- Every feature ships with tests. Backend: Vitest + Supertest against the app. Frontend: Vitest + React Testing Library, testing behavior not implementation details.
+- Tests must be able to fail: assert on real behavior, not just "doesn't throw".
+- No `.only`, no skipped tests committed, never bypass the pre-commit hook.
+
+## Style
+
+- Prettier formats, ESLint lints — both must pass before commit.
+- No commented-out code, no dead code. No TODO without a linked plan.
+- Comments explain *why*, never narrate *what* the code does.
+
+## Git
+
+- Small commits, imperative mood: `feat(entries): add pagination to list endpoint`. Explain why in the body when non-obvious.
+- Conventional prefixes: feat, fix, refactor, test, chore, docs.
