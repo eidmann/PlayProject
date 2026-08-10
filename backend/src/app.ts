@@ -29,13 +29,5 @@ export function createApp() {
     return res.status(201).json(createdEntry);
   });
 
-  app.delete('/api/entries/:id', async (req, res) => {
-    const { id } = req.params;
-    await prisma.journalEntry.delete({
-      where: { id },
-    });
-    return res.status(204).send();
-  });
-
   return app;
 }
