@@ -19,6 +19,7 @@ afterEach(async () => {
     where: { id: { in: createdEntryIds } },
   });
   createdEntryIds.length = 0;
+  vi.restoreAllMocks();
 });
 
 afterAll(async () => {
@@ -128,7 +129,9 @@ describe('DELETE /api/entries/:id', () => {
       error: 'Entry not found',
     });
   });
+});
 
+describe('error middleware', () => {
   it('returns 500 JSON when an unexpected error occurs', async () => {
     vi.spyOn(prisma.journalEntry, 'findUnique').mockRejectedValueOnce(
       new Error('database exploded'),
