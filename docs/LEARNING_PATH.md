@@ -2,7 +2,7 @@
 
 This is the curriculum. Each milestone pairs concepts to study with a real MindLog feature the student builds. A milestone is complete only when its Definition of Done is met and the student can explain every design decision.
 
-**Active milestone: 1**
+**Active milestone: 2**
 
 ---
 

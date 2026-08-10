@@ -1,6 +1,7 @@
 import express from 'express';
 import { createJournalEntrySchema } from './schemas/journalEntrySchemas.js';
 import { prisma } from './lib/prisma.js';
+import { Prisma } from '@prisma/client';
 
 /**
  * App factory: building the app separately from starting the server
@@ -28,6 +29,36 @@ export function createApp() {
 
     return res.status(201).json(createdEntry);
   });
+
+  app.get('/api/entries/:id', async (req, res) => {
+    const entry = await prisma.journalEntry.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!entry) {
+      return res.status(404).json({ error: 'Entry not found' });
+    }
+    return res.status(200).json(entry);
+  });
+
+  app.delete('/api/entries/:id', async (req, res) => {
+    try {
+      await prisma.journalEntry.delete({ where: { id: req.params.id } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return res.status(404).json({ error: 'Entry not found' });
+      }
+      throw error;
+    }
+
+    return res.status(204).send();
+  });
+
+  app.use(
+    (err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      console.error(err);
+      return res.status(500).json({ error: 'Internal server error' });
+    },
+  );
 
   return app;
 }
