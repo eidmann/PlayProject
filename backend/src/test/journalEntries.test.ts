@@ -1,4 +1,4 @@
-import { afterEach, afterAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app.js';
 import { z } from 'zod';
@@ -12,14 +12,24 @@ const entryResponseSchema = z.object({
   content: z.string(),
 });
 
-const createdEntryIds: string[] = [];
+const paginatedEntriesResponseSchema = z.object({
+  data: z.array(entryResponseSchema),
+  pagination: z.object({
+    page: z.number(),
+    limit: z.number(),
+    total: z.number(),
+    totalPages: z.number(),
+  }),
+});
+
+beforeAll(async () => {
+  await prisma.$connect();
+  await prisma.journalEntry.deleteMany();
+}, 30_000);
 
 afterEach(async () => {
-  await prisma.journalEntry.deleteMany({
-    where: { id: { in: createdEntryIds } },
-  });
-  createdEntryIds.length = 0;
   vi.restoreAllMocks();
+  await prisma.journalEntry.deleteMany();
 });
 
 afterAll(async () => {
@@ -36,7 +46,6 @@ describe('POST /api/entries', () => {
     expect(response.status).toBe(201);
 
     const entry = entryResponseSchema.parse(response.body);
-    createdEntryIds.push(entry.id);
 
     expect(entry.title).toBe('Test Entry');
     expect(entry.content).toBe('This is a test entry');
@@ -64,7 +73,6 @@ describe('POST /api/entries', () => {
     expect(response.status).toBe(201);
 
     const entry = entryResponseSchema.parse(response.body);
-    createdEntryIds.push(entry.id);
 
     expect(entry.title).toBe('Test Entry');
     expect(entry.content).toBe('This is a test entry');
@@ -82,7 +90,6 @@ describe('GET /api/entries/:id', () => {
     });
     expect(createdEntry.title).toBe('Test Entry');
     expect(createdEntry.content).toBe('Test Content');
-    createdEntryIds.push(createdEntry.id);
     const response = await request(createApp()).get(`/api/entries/${createdEntry.id}`);
     expect(response.status).toBe(200);
     const parsedResponse = entryResponseSchema.parse(response.body);
@@ -108,7 +115,6 @@ describe('DELETE /api/entries/:id', () => {
     });
     expect(createdEntry.status).toBe(201);
     const entry = entryResponseSchema.parse(createdEntry.body);
-    createdEntryIds.push(entry.id);
     const response = await request(createApp()).delete(`/api/entries/${entry.id}`);
     expect(response.status).toBe(204);
     const deletedEntry = await prisma.journalEntry.findUnique({
@@ -141,5 +147,136 @@ describe('error middleware', () => {
     expect(response.body).toMatchObject({
       error: 'Internal server error',
     });
+  });
+});
+
+describe('GET /api/entries', () => {
+  beforeEach(async () => {
+    await Promise.all([
+      prisma.journalEntry.create({
+        data: {
+          title: 'Oldest',
+          content: 'First Entry',
+          createdAt: new Date('2026-01-01T10:00:00.000Z'),
+        },
+      }),
+      prisma.journalEntry.create({
+        data: {
+          title: 'Middle',
+          content: 'Second Entry',
+          createdAt: new Date('2026-01-02T10:00:00.000Z'),
+        },
+      }),
+      prisma.journalEntry.create({
+        data: {
+          title: 'Newest',
+          content: 'Third Entry',
+          createdAt: new Date('2026-01-03T10:00:00.000Z'),
+        },
+      }),
+    ]);
+  });
+
+  it('returns 200 OK and the entries from the DB if they exist', async () => {
+    const response = await request(createApp()).get('/api/entries');
+    expect(response.status).toBe(200);
+    const parsedResponse = paginatedEntriesResponseSchema.parse(response.body);
+    expect(parsedResponse.data).toHaveLength(3);
+    expect(parsedResponse.data.map((entry) => entry.title)).toEqual(['Newest', 'Middle', 'Oldest']);
+    expect(parsedResponse.pagination.page).toBe(1);
+    expect(parsedResponse.pagination.limit).toBe(10);
+    expect(parsedResponse.pagination.total).toBe(3);
+    expect(parsedResponse.pagination.totalPages).toBe(1);
+  });
+
+  it('returns 200 OK and the second page when limit is 2', async () => {
+    const response = await request(createApp()).get('/api/entries?page=2&limit=2');
+    expect(response.status).toBe(200);
+    const parsedResponse = paginatedEntriesResponseSchema.parse(response.body);
+    expect(parsedResponse.data).toHaveLength(1);
+    expect(parsedResponse.data.map((entry) => entry.title)).toEqual(['Oldest']);
+    expect(parsedResponse.pagination.page).toBe(2);
+    expect(parsedResponse.pagination.limit).toBe(2);
+    expect(parsedResponse.pagination.total).toBe(3);
+    expect(parsedResponse.pagination.totalPages).toBe(2);
+  });
+
+  it('returns 200 OK and empty array if the page is greater than the total pages', async () => {
+    const response = await request(createApp()).get('/api/entries?page=20&limit=2');
+    expect(response.status).toBe(200);
+    const parsedResponse = paginatedEntriesResponseSchema.parse(response.body);
+    expect(parsedResponse.data).toHaveLength(0);
+    expect(parsedResponse.pagination.page).toBe(20);
+    expect(parsedResponse.pagination.limit).toBe(2);
+    expect(parsedResponse.pagination.total).toBe(3);
+    expect(parsedResponse.pagination.totalPages).toBe(2);
+  });
+
+  it('returns 400 bad request if page is less than 1', async () => {
+    const response = await request(createApp()).get('/api/entries?page=0&limit=2');
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid query parameters',
+    });
+  });
+
+  it('returns 400 bad request if page is not a number', async () => {
+    const response = await request(createApp()).get('/api/entries?page=abc&limit=2');
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid query parameters',
+    });
+  });
+
+  it('returns 400 bad request if limit is not a number', async () => {
+    const response = await request(createApp()).get('/api/entries?page=1&limit=abc');
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid query parameters',
+    });
+  });
+
+  it('returns 400 bad request if limit is less than 1', async () => {
+    const response = await request(createApp()).get('/api/entries?page=1&limit=0');
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid query parameters',
+    });
+  });
+
+  it('returns 400 bad request if limit is greater than 100', async () => {
+    const response = await request(createApp()).get('/api/entries?page=1&limit=101');
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid query parameters',
+    });
+  });
+
+  it('returns 400 bad request if page is not an integer', async () => {
+    const response = await request(createApp()).get('/api/entries?page=1.5&limit=2');
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid query parameters',
+    });
+  });
+
+  it('returns 400 bad request if limit is not an integer', async () => {
+    const response = await request(createApp()).get('/api/entries?page=1&limit=2.5');
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid query parameters',
+    });
+  });
+
+  it('returns empty list when no entries exist', async () => {
+    await prisma.journalEntry.deleteMany();
+    const response = await request(createApp()).get('/api/entries?page=1&limit=10');
+    expect(response.status).toBe(200);
+    const parsedResponse = paginatedEntriesResponseSchema.parse(response.body);
+    expect(parsedResponse.data).toHaveLength(0);
+    expect(parsedResponse.pagination.page).toBe(1);
+    expect(parsedResponse.pagination.limit).toBe(10);
+    expect(parsedResponse.pagination.total).toBe(0);
+    expect(parsedResponse.pagination.totalPages).toBe(0);
   });
 });
