@@ -280,3 +280,70 @@ describe('GET /api/entries', () => {
     expect(parsedResponse.pagination.totalPages).toBe(0);
   });
 });
+
+describe('PUT /api/entries/:id', () => {
+  it('returns 200 OK and the updated entry if successful', async () => {
+    const createdEntry = await request(createApp()).post('/api/entries').send({
+      title: 'Test Entry',
+      content: 'Test Content',
+    });
+    expect(createdEntry.status).toBe(201);
+    const parsedEntry = entryResponseSchema.parse(createdEntry.body);
+    const response = await request(createApp()).put(`/api/entries/${parsedEntry.id}`).send({
+      title: 'Updated Title',
+      content: 'Updated Content',
+    });
+    expect(response.status).toBe(200);
+    const parsedResponse = entryResponseSchema.parse(response.body);
+    expect(parsedResponse.title).toBe('Updated Title');
+    expect(parsedResponse.content).toBe('Updated Content');
+    expect(parsedResponse.id).toBe(parsedEntry.id);
+    expect(new Date(parsedResponse.updatedAt).getTime()).toBeGreaterThan(
+      new Date(parsedEntry.updatedAt).getTime(),
+    );
+  });
+
+  it('returns 404 not found if the ID is not found in the DB', async () => {
+    const response = await request(createApp()).put('/api/entries/123').send({
+      title: 'Update Title',
+      content: 'Update Content',
+    });
+    expect(response.status).toBe(404);
+    expect(response.body).toMatchObject({
+      error: 'Entry not found',
+    });
+  });
+
+  it('returns 400 bad request if the request body is invalid', async () => {
+    const response = await request(createApp()).put('/api/entries/123').send({
+      title: '',
+      content: '',
+    });
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid request body',
+    });
+  });
+
+  it('returns 200 OK and the original ID if trying to update the ID', async () => {
+    const createdEntry = await request(createApp()).post('/api/entries').send({
+      title: 'Test Entry',
+      content: 'Test Content',
+    });
+    expect(createdEntry.status).toBe(201);
+    const parsedEntry = entryResponseSchema.parse(createdEntry.body);
+    const response = await request(createApp()).put(`/api/entries/${parsedEntry.id}`).send({
+      id: 'hacker-chosen',
+      title: 'Updated Title',
+      content: 'Updated Content',
+    });
+    expect(response.status).toBe(200);
+    const parsedResponse = entryResponseSchema.parse(response.body);
+    expect(parsedResponse.id).toBe(parsedEntry.id);
+    expect(parsedResponse.title).toBe('Updated Title');
+    expect(parsedResponse.content).toBe('Updated Content');
+    expect(new Date(parsedResponse.updatedAt).getTime()).toBeGreaterThan(
+      new Date(parsedEntry.updatedAt).getTime(),
+    );
+  });
+});

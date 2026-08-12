@@ -1,5 +1,9 @@
 import express from 'express';
-import { createJournalEntrySchema, paginationSchema } from './schemas/journalEntrySchemas.js';
+import {
+  createJournalEntrySchema,
+  paginationSchema,
+  updateJournalEntrySchema,
+} from './schemas/journalEntrySchemas.js';
 import { prisma } from './lib/prisma.js';
 import { Prisma } from '@prisma/client';
 
@@ -61,6 +65,28 @@ export function createApp() {
       return res.status(404).json({ error: 'Entry not found' });
     }
     return res.status(200).json(entry);
+  });
+
+  app.put('/api/entries/:id', async (req, res) => {
+    const result = updateJournalEntrySchema.safeParse(req.body);
+    if (!result.success) {
+      return res
+        .status(400)
+        .json({ error: 'Invalid request body', fields: result.error.flatten().fieldErrors });
+    }
+    const { title, content } = result.data;
+    try {
+      const updatedEntry = await prisma.journalEntry.update({
+        where: { id: req.params.id },
+        data: { title, content },
+      });
+      return res.status(200).json(updatedEntry);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return res.status(404).json({ error: 'Entry not found' });
+      }
+      throw error;
+    }
   });
 
   app.delete('/api/entries/:id', async (req, res) => {
