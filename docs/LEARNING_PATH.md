@@ -2,57 +2,61 @@
 
 This is the curriculum. Each milestone pairs concepts to study with a real MindLog feature the student builds. A milestone is complete only when its Definition of Done is met and the student can explain every design decision.
 
-**Active milestone: 2**
+**Active milestone: 3**
+
+Milestones 1–2 are complete (journal entry API + tests). Frontend is still a shell.
 
 ---
 
-## Milestone 1 — Foundations refresh
+## Milestone 1 — Foundations refresh — DONE
 
 **Feature: `POST /api/entries` — create a journal entry.**
 
-Concepts to study before/while building:
-
-- TypeScript strict mode: what `strict` actually enables, why `any` defeats the purpose, `unknown` vs `any`
-- The anatomy of an Express route: middleware, request/response lifecycle, async error handling
-- Reading a failing test: red → green → refactor
-- Zod: parsing untrusted input at the boundary, inferring TS types from schemas
-
-Exercise:
-
-1. Read the existing `GET /api/health` endpoint and its test. Understand every line.
-2. Write a failing Supertest test for `POST /api/entries` first (valid body → 201 with the created entry; invalid body → 400 with a useful error).
-3. Implement the route with Zod validation and Prisma, making the test pass.
-4. Request a mentor review. Fix findings yourself.
-
-Definition of Done: README checklist + student can explain what happens between the HTTP request arriving and the row appearing in Postgres.
+Shipped: Zod body validation, Prisma create, Supertest coverage (201 / 400 / mass-assignment), test cleanup patterns.
 
 ---
 
-## Milestone 2 — Backend craft
+## Milestone 2 — Backend craft — DONE
 
 **Feature: full CRUD for journal entries.**
 
-- REST resource design: URLs, verbs, status codes, when to return what
-- Prisma migrations: how schema changes flow to the database, why migrations are code
-- Layering: route → service → data access, and when that separation earns its keep
-- Central error handling in Express; error types vs stringly-typed errors
-- Pagination and sorting for the list endpoint
+Shipped:
 
-Exercise: `GET /api/entries` (paginated), `GET /api/entries/:id`, `PUT /api/entries/:id`, `DELETE /api/entries/:id` — all test-first.
+- `GET /api/entries/:id`, `PUT /api/entries/:id`, `DELETE /api/entries/:id`
+- Paginated `GET /api/entries` with Zod query schema
+- Central Express error middleware (4-arg, registered last)
+- Dedicated Neon test database via `backend/src/test/setup.ts`
+
+Layering (route → service) was deferred; `app.ts` still holds all routes. Extract when it starts to hurt (likely during milestone 3 or 6).
 
 ---
 
-## Milestone 3 — Frontend + Redux
+## Milestone 3 — Frontend + Redux — ACTIVE
 
 **Feature: journal UI — entry list, entry editor, entry detail.**
+
+Concepts to study before/while building:
 
 - React mental model: rendering, state, props, when a component re-renders
 - Hooks: `useState`, `useEffect` (and why you need it less than you think), custom hooks
 - Redux Toolkit: store, slices, `createSlice`, when Redux is worth it vs local state
 - RTK Query: data fetching, caching, invalidation — replacing hand-rolled `useEffect` fetching
 - React Router: routes, params, navigation
+- Tailwind utilities (already installed) for layout/styling
 
-Exercise: build the journal list page and editor form, wired to the real API via RTK Query. Component tests with React Testing Library (test behavior, not implementation).
+Exercise: build the journal list page and editor form, wired to the real API via RTK Query. Component tests with React Testing Library (test behavior, not implementation details).
+
+API to consume (already live):
+
+| Method | Path               | Notes                                         |
+| ------ | ------------------ | --------------------------------------------- |
+| GET    | `/api/entries`     | Paginated list; Vite proxies `/api` → `:3001` |
+| GET    | `/api/entries/:id` | Single entry                                  |
+| POST   | `/api/entries`     | Create `{ title, content }`                   |
+| PUT    | `/api/entries/:id` | Full replace of title/content                 |
+| DELETE | `/api/entries/:id` | 204 empty body                                |
+
+Definition of Done: README checklist + student can explain data flow from click → RTK Query → API → Redux cache → UI.
 
 ---
 

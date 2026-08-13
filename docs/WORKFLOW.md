@@ -85,3 +85,4 @@ CI (GitHub Actions) must be green. Then merge to `main`. `main` is always releas
 - No `--no-verify`, no skipped tests committed, no `.only` left behind.
 - If you don't understand a piece of code — yours or AI-generated — stop and understand it before moving on. That's the whole point of this project.
 - When AI writes anything, review it hunk by hunk with `git add -p` like it came from an intern: smart, fast, occasionally confidently wrong.
+- Backend tests hit a Neon **test** branch (`TEST_*` env vars). If `prisma.$connect()` fails, wake the branch in the Neon console and retry — do not point tests at the development database.

@@ -15,12 +15,18 @@ Professional quality, no shortcuts. These apply to all code, whoever writes it.
 ## Validation and errors
 
 - Validate all external input (request bodies, query params, third-party API responses) with Zod at the boundary. Never pass unvalidated data to Prisma or business logic.
+- Separate schemas for body vs query vs (test-only) HTTP response. Do not parse Prisma `Date` fields with a JSON response schema.
+- Query strings are strings until coerced (`z.coerce.number()`, etc.).
 - No swallowed errors. Every `catch` either handles meaningfully or rethrows with context.
-- API errors: correct status codes (400 validation, 404 missing, 500 unexpected) with a JSON body `{ "error": string }`.
+- API errors: `400` validation (`Invalid request body` / `Invalid query parameters`), `404` missing (`Entry not found`), `500` unexpected via central 4-arg error middleware — JSON `{ "error": string }` (optional `fields`).
+- Prisma `P2025` on update/delete → 404; other errors rethrow to the middleware.
+- Mass assignment: only allow client-owned fields through Zod; never take `id` or timestamps from the client.
 
 ## Testing
 
 - Every feature ships with tests. Backend: Vitest + Supertest against the app. Frontend: Vitest + React Testing Library, testing behavior not implementation details.
+- Backend tests use a dedicated Neon DB (`TEST_DATABASE_URL` / `TEST_DIRECT_URL`) via `backend/src/test/setup.ts`. Never wipe the development database.
+- Assert HTTP status before parsing `response.body`. Restore Vitest mocks in `afterEach`.
 - Tests must be able to fail: assert on real behavior, not just "doesn't throw".
 - No `.only`, no skipped tests committed, never bypass the pre-commit hook.
 

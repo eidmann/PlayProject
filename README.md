@@ -70,14 +70,17 @@ nvm use
 # 1. Install all dependencies (root, frontend, backend — npm workspaces)
 npm install
 
-# 2. Create a free PostgreSQL database at https://neon.tech
-#    (sign up, create a project named "mindlog", copy the connection strings)
+# 2. Create a free PostgreSQL project at https://neon.tech
+#    - Main branch → DATABASE_URL (pooled) + DIRECT_URL (direct)
+#    - Separate Neon branch for tests → TEST_DATABASE_URL + TEST_DIRECT_URL
+#    (backend tests wipe journal entries; never point TEST_* at the dev DB)
 
 # 3. Set up backend environment
-cp backend/.env.example backend/.env   # then paste the Neon connection strings
+cp backend/.env.example backend/.env   # then paste all four Neon URLs
 
-# 4. Apply database migrations
+# 4. Apply migrations to both DBs
 npm run db:migrate
+# then: DATABASE_URL=$TEST_DATABASE_URL DIRECT_URL=$TEST_DIRECT_URL npx -w backend prisma migrate deploy
 
 # 5. Run everything
 npm run dev          # starts backend (:3001) and frontend (:5173) together
@@ -96,6 +99,23 @@ npm run dev          # starts backend (:3001) and frontend (:5173) together
 | `npm run db:migrate`   | Run Prisma migrations against the database |
 | `npm run db:studio`    | Open Prisma Studio to browse the database  |
 
-## Current state
+## Current state (handoff for agents)
 
-See [docs/LEARNING_PATH.md](docs/LEARNING_PATH.md) for which milestone is active. The scaffold ships with exactly one backend endpoint (`GET /api/health`) and an empty frontend shell — everything else is built by the student, milestone by milestone.
+**Active milestone: 3** — see [docs/LEARNING_PATH.md](docs/LEARNING_PATH.md).
+
+| Area                 | Status                                                                                              |
+| -------------------- | --------------------------------------------------------------------------------------------------- |
+| Backend journal CRUD | Done: `POST/GET/PUT/DELETE /api/entries`, paginated `GET /api/entries`, central JSON 500 middleware |
+| Backend tests        | Vitest + Supertest in `backend/src/test/`; setup switches Prisma to Neon **test** branch            |
+| Frontend             | Vite + React + Tailwind + empty Redux store shell; Tailwind installed; no journal UI yet            |
+| Auth / OpenAI / mood | Not started (milestones 4–6)                                                                        |
+
+### Conventions established in milestones 1–2 (do not reinvent)
+
+- **Zod at boundaries:** separate schemas for request body, query params, and (in tests) HTTP response shapes. Never Zod-parse Prisma `Date` objects with a JSON response schema.
+- **Query params are strings** until `z.coerce.number()` (etc.). Defaults live on the query schema.
+- **Errors:** `400` + `{ error: 'Invalid request body' }` or `'Invalid query parameters'` (optional `fields`); `404` + `{ error: 'Entry not found' }`; unexpected → middleware `500` + `{ error: 'Internal server error' }`.
+- **Prisma `P2025`** (update/delete missing row) → map to 404; rethrow anything else into the error middleware.
+- **Mass assignment:** input schemas allow only client-owned fields (`title`, `content`); never accept `id` / timestamps from the client.
+- **List pagination:** `{ data, pagination: { page, limit, total, totalPages } }`; defaults `page=1`, `limit=10`, max limit 100; sort `createdAt desc`, `id desc`; empty DB → `totalPages: 0`; page past end → `200` + `data: []` with real `total`/`totalPages`.
+- **Tests:** resource-focused file `journalEntries.test.ts`; assert status before parsing body; restore Vitest mocks in `afterEach`; Neon may need waking if `$connect` fails.
