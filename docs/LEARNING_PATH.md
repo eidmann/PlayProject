@@ -2,9 +2,9 @@
 
 This is the curriculum. Each milestone pairs concepts to study with a real MindLog feature the student builds. A milestone is complete only when its Definition of Done is met and the student can explain every design decision.
 
-**Active milestone: 3**
+**Active milestone: 4**
 
-Milestones 1–2 are complete (journal entry API + tests). Frontend is still a shell.
+Milestones 1–3 are complete (journal entry API + journal UI with RTK Query). Next: mood tracking, test-first.
 
 ---
 
@@ -27,26 +27,24 @@ Shipped:
 - Central Express error middleware (4-arg, registered last)
 - Dedicated Neon test database via `backend/src/test/setup.ts`
 
-Layering (route → service) was deferred; `app.ts` still holds all routes. Extract when it starts to hurt (likely during milestone 3 or 6).
+Layering (route → service) was deferred; `app.ts` still holds all routes. Extract when it starts to hurt (likely during milestone 6). See README “After original milestones”.
 
 ---
 
-## Milestone 3 — Frontend + Redux — ACTIVE
+## Milestone 3 — Frontend + Redux — DONE
 
 **Feature: journal UI — entry list, entry editor, entry detail.**
 
-Concepts to study before/while building:
+Shipped:
 
-- React mental model: rendering, state, props, when a component re-renders
-- Hooks: `useState`, `useEffect` (and why you need it less than you think), custom hooks
-- Redux Toolkit: store, slices, `createSlice`, when Redux is worth it vs local state
-- RTK Query: data fetching, caching, invalidation — replacing hand-rolled `useEffect` fetching
-- React Router: routes, params, navigation
-- Tailwind utilities (already installed) for layout/styling
+- List (`EntryListPage`): paginated titles, empty/loading/error, link to create
+- Detail (`EntryDetailPage`): content, API errors, Edit/Back, delete with `window.confirm`
+- Create + edit (`EntryFormPage` + `EntryFormFields`): POST/PUT, 400 field errors, prefill on edit, navigate to detail
+- RTK Query `entriesApi` (`baseUrl: '/api'`), cache tags, invalidation on mutations
+- React Router in `App.tsx`: `/`, `/entries/new`, `/entries/:id/edit` before `/entries/:id`
+- RTL tests via `renderWithProviders`; fetch helpers in `frontend/src/test/`
 
-Exercise: build the journal list page and editor form, wired to the real API via RTK Query. Component tests with React Testing Library (test behavior, not implementation details).
-
-API to consume (already live):
+API consumed (already live):
 
 | Method | Path               | Notes                                         |
 | ------ | ------------------ | --------------------------------------------- |
@@ -58,9 +56,11 @@ API to consume (already live):
 
 Definition of Done: README checklist + student can explain data flow from click → RTK Query → API → Redux cache → UI.
 
+Known polish deferred to [README — After original milestones](../README.md#after-original-milestones): no Zod on frontend JSON; list error copy is hardcoded.
+
 ---
 
-## Milestone 4 — Testing depth
+## Milestone 4 — Testing depth — ACTIVE
 
 **Feature: mood tracking (mood on each entry, mood history view).**
 

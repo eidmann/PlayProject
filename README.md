@@ -101,14 +101,16 @@ npm run dev          # starts backend (:3001) and frontend (:5173) together
 
 ## Current state (handoff for agents)
 
-**Active milestone: 3** — see [docs/LEARNING_PATH.md](docs/LEARNING_PATH.md).
+**Active milestone: 4** — mood tracking, strictly test-first. See [docs/LEARNING_PATH.md](docs/LEARNING_PATH.md). Do not rebuild the journal UI.
 
-| Area                 | Status                                                                                              |
-| -------------------- | --------------------------------------------------------------------------------------------------- |
-| Backend journal CRUD | Done: `POST/GET/PUT/DELETE /api/entries`, paginated `GET /api/entries`, central JSON 500 middleware |
-| Backend tests        | Vitest + Supertest in `backend/src/test/`; setup switches Prisma to Neon **test** branch            |
-| Frontend             | Vite + React + Tailwind + empty Redux store shell; Tailwind installed; no journal UI yet            |
-| Auth / OpenAI / mood | Not started (milestones 4–6)                                                                        |
+| Area                 | Status                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Backend journal CRUD | Done: `POST/GET/PUT/DELETE /api/entries`, paginated `GET /api/entries`, central JSON 500 middleware                 |
+| Backend tests        | Vitest + Supertest in `backend/src/test/`; setup switches Prisma to Neon **test** branch                            |
+| Frontend journal UI  | Done: list, detail, create, edit, delete via RTK Query + React Router; RTL tests in `frontend/src/pages/*.test.tsx` |
+| Auth / OpenAI / mood | Not started (milestones 4–6)                                                                                        |
+
+Vite still proxies `/api` → backend `:3001`. Routes live in `frontend/src/App.tsx` (`/` list, `/entries/new`, `/entries/:id/edit` **before** `/entries/:id`).
 
 ### Conventions established in milestones 1–2 (do not reinvent)
 
@@ -119,3 +121,21 @@ npm run dev          # starts backend (:3001) and frontend (:5173) together
 - **Mass assignment:** input schemas allow only client-owned fields (`title`, `content`); never accept `id` / timestamps from the client.
 - **List pagination:** `{ data, pagination: { page, limit, total, totalPages } }`; defaults `page=1`, `limit=10`, max limit 100; sort `createdAt desc`, `id desc`; empty DB → `totalPages: 0`; page past end → `200` + `data: []` with real `total`/`totalPages`.
 - **Tests:** resource-focused file `journalEntries.test.ts`; assert status before parsing body; restore Vitest mocks in `afterEach`; Neon may need waking if `$connect` fails.
+
+### Conventions established in milestone 3 (do not reinvent)
+
+- **Server vs client state:** RTK Query owns fetched journal data (`frontend/src/api/entriesApi.ts`, `baseUrl: '/api'`). Form drafts stay in local `useState` (`EntryFormFields`). Do not add a `createSlice` for entries.
+- **Cache tags:** list `providesTags: ['Entry']`; detail `{ type: 'Entry', id }`. Create invalidates `'Entry'`; update/delete invalidate both the specific id and `'Entry'`.
+- **DELETE is 204:** empty body — treat success as `!('error' in result)`, not `result.data`.
+- **Edit form prefill:** do not mount `EntryFormFields` until GET has data, or `initialTitle`/`initialContent` never update (local state is initialized once).
+- **Tests:** `renderWithProviders` (fresh store + `MemoryRouter`). Stub `globalThis.fetch`; RTK passes a `Request`, so use `getFetchUrl` / `getRequestBody` — do not assume the first argument is a string. Spy `window.confirm` **before** the click (happy-dom has no `confirm`). Keep in-memory entry state **outside** the `vi.fn` so PUT then GET sees updates.
+- **`useParams` in tests:** the rendered tree must include a matching `<Route>`, and `initialEntries` must be a real URL (`/entries/abc/edit`), not the pattern `/entries/:id/edit`.
+
+### After original milestones
+
+Known gaps to pick up after milestones 4–7, unless a later milestone forces them sooner:
+
+- **No Zod on frontend JSON.** `entriesApi` types trust the network. Parse responses (and optionally mutation bodies) with Zod at the RTK Query boundary so untrusted JSON is not passed through as typed data.
+- **List errors are hardcoded.** `EntryListPage` shows `"Error loading entries"`; detail/form use `getApiErrorMessage`. Use the API message (with a fallback) on the list too.
+- **Backend routes still live in `app.ts`.** Extract route → service when it starts to hurt (likely around auth in milestone 6).
+- **UI is unstyled.** Tailwind is installed; pages are functional, not laid out. Polish after the product features exist.

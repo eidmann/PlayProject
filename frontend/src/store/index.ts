@@ -1,9 +1,12 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
+import { entriesApi } from '../api/entriesApi';
 
-// Slices are added here as they are built (first one arrives in milestone 3).
 export const store = configureStore({
-  reducer: {},
+  reducer: {
+    [entriesApi.reducerPath]: entriesApi.reducer,
+  },
+  middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(entriesApi.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;
