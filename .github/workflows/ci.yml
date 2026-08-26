@@ -5,9 +5,50 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege for GITHUB_TOKEN: this workflow only reads code.
+permissions:
+  contents: read
+
 jobs:
-  checks:
+  quality:
+    name: Lint, format, typecheck, test frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Type-aware ESLint and tsc both need the generated Prisma client.
+      - name: Generate Prisma client
+        run: npx -w backend prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test frontend
+        run: npm test -w frontend
+
+  test:
+    name: Test backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only this job touches the shared Neon CI branch, so only this job queues.
+    concurrency:
+      group: ci-database
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
@@ -22,14 +63,14 @@ jobs:
       - name: Generate Prisma client
         run: npx -w backend prisma generate
 
-      - name: Lint
-        run: npm run lint
+      - name: Apply migrations to the CI database
+        run: npx -w backend prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.CI_DIRECT_URL }}
 
-      - name: Check formatting
-        run: npm run format:check
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test
-        run: npm test
+      - name: Test backend
+        run: npm test -w backend
+        env:
+          TEST_DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+          TEST_DIRECT_URL: ${{ secrets.CI_DIRECT_URL }}
