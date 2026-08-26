@@ -35,6 +35,7 @@ export function EntryDetailPage() {
     <div>
       <h1>{data.title}</h1>
       <p>{data.content}</p>
+      <p>{data.mood ?? 'N/A'}</p>
       <Link to={`/entries/${data.id}/edit`}>Edit</Link>
       <button
         type="button"

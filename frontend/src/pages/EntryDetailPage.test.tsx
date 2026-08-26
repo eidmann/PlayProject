@@ -14,11 +14,12 @@ afterEach(() => {
 });
 
 describe('EntryDetailPage', () => {
-  it('shows title and content from the API', async () => {
+  it('shows title, content, and mood from the API', async () => {
     stubJson({
       id: 'abc',
       title: 'My First Post',
       content: 'This is my first post',
+      mood: 'GOOD',
       createdAt: '2026-01-01',
       updatedAt: '2026-01-01',
     });
@@ -32,6 +33,29 @@ describe('EntryDetailPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'My First Post' })).toBeInTheDocument();
     expect(screen.getByText('This is my first post')).toBeInTheDocument();
+    expect(screen.getByText('GOOD')).toBeInTheDocument();
+  });
+
+  it('shows omitted mood as "N/A"', async () => {
+    stubJson({
+      id: 'abc',
+      title: 'My First Post',
+      content: 'This is my first post',
+      mood: null,
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
+    });
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/entries/:id" element={<EntryDetailPage />} />
+      </Routes>,
+      { initialEntries: ['/entries/abc'] },
+    );
+
+    expect(await screen.findByRole('heading', { name: 'My First Post' })).toBeInTheDocument();
+    expect(screen.getByText('This is my first post')).toBeInTheDocument();
+    expect(screen.getByText('N/A')).toBeInTheDocument();
   });
 
   it('shows the API error when the entry does not exist', async () => {

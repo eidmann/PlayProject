@@ -10,6 +10,14 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum Mood {
+  GREAT
+  GOOD
+  OKAY
+  LOW
+  BAD
+}
+
 model User {
   id        String         @id @default(cuid())
   email     String         @unique
@@ -21,6 +29,7 @@ model JournalEntry {
   id        String   @id @default(cuid())
   title     String
   content   String
+  mood      Mood?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

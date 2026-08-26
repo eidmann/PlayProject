@@ -6,6 +6,7 @@ import {
 } from '../api/entriesApi';
 import { getApiErrorMessage } from '../api/errorMessage';
 import { EntryFormFields } from '../components/EntryFormFields';
+import type { Mood } from '../types/moodType';
 
 export function EntryFormPage() {
   const navigate = useNavigate();
@@ -17,16 +18,16 @@ export function EntryFormPage() {
   const [updateEntry, { isLoading: isUpdating, isError: isUpdateError, error: updateError }] =
     useUpdateEntryMutation();
 
-  async function handleCreateSubmit(title: string, content: string) {
-    const result = await createEntry({ title, content });
+  async function handleCreateSubmit(title: string, content: string, mood: Mood) {
+    const result = await createEntry({ title, content, mood });
     if ('data' in result && result.data) {
       await navigate(`/entries/${result.data.id}`);
     }
   }
 
-  async function handleEditSubmit(title: string, content: string) {
+  async function handleEditSubmit(title: string, content: string, mood: Mood) {
     if (!id) return;
-    const result = await updateEntry({ id, title, content });
+    const result = await updateEntry({ id, title, content, mood });
     if ('data' in result && result.data) {
       await navigate(`/entries/${id}`);
     }
@@ -47,6 +48,7 @@ export function EntryFormPage() {
   const heading = isEdit ? 'Edit Entry' : 'New Entry';
   const initialTitle = isEdit ? data?.title : '';
   const initialContent = isEdit ? data?.content : '';
+  const initialMood = isEdit ? data?.mood : null;
   const onSubmit = isEdit ? handleEditSubmit : handleCreateSubmit;
   const submitErrorMessage = isEdit
     ? isUpdateError
@@ -62,6 +64,7 @@ export function EntryFormPage() {
       heading={heading}
       initialTitle={initialTitle}
       initialContent={initialContent}
+      initialMood={initialMood}
       onSubmit={onSubmit}
       isSaving={isSaving}
       submitErrorMessage={submitErrorMessage}

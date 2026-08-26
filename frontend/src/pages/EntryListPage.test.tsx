@@ -19,6 +19,7 @@ describe('EntryListPage', () => {
           id: 'abc',
           title: 'My first entry',
           content: 'Content of my first entry',
+          mood: 'GOOD',
           createdAt: '2026-01-01T00:00:00.000Z',
           updatedAt: '2026-01-01T00:00:00.000Z',
         },
@@ -33,8 +34,12 @@ describe('EntryListPage', () => {
       'href',
       '/entries/abc',
     );
-    expect(await screen.findByText('Showing 1 entries')).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'New Entry' })).toBeInTheDocument();
+    expect(screen.queryByText('GOOD')).not.toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /View Mood History/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /View Mood History/i })).toHaveAttribute(
+      'href',
+      '/moods',
+    );
   });
 
   it('shows empty message when there are no entries', async () => {
@@ -110,6 +115,7 @@ describe('EntryListPage', () => {
                   id: '1',
                   title: 'Page one entry',
                   content: 'x',
+                  mood: 'GOOD',
                   createdAt: '...',
                   updatedAt: '...',
                 },
@@ -129,6 +135,7 @@ describe('EntryListPage', () => {
                   id: '2',
                   title: 'Page two entry',
                   content: 'y',
+                  mood: 'BAD',
                   createdAt: '...',
                   updatedAt: '...',
                 },
@@ -150,6 +157,7 @@ describe('EntryListPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
     expect(await screen.findByRole('link', { name: 'Page two entry' })).toBeInTheDocument();
+    expect(screen.queryByText('GOOD')).not.toBeInTheDocument();
   });
 
   it('disables the Previous button when on the first page', async () => {
@@ -187,6 +195,7 @@ describe('EntryListPage', () => {
                   id: '1',
                   title: 'Page one entry',
                   content: 'x',
+                  mood: 'GOOD',
                   createdAt: '...',
                   updatedAt: '...',
                 },
@@ -206,6 +215,7 @@ describe('EntryListPage', () => {
                   id: '2',
                   title: 'Page two entry',
                   content: 'y',
+                  mood: 'BAD',
                   createdAt: '...',
                   updatedAt: '...',
                 },
@@ -228,5 +238,6 @@ describe('EntryListPage', () => {
 
     expect(await screen.findByRole('link', { name: 'Page two entry' })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(screen.queryByText('BAD')).not.toBeInTheDocument();
   });
 });

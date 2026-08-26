@@ -24,6 +24,7 @@ export function EntryListPage() {
     <div>
       <h1>Entries</h1>
       <Link to="/entries/new">New Entry</Link>
+      <Link to="/moods">View Mood History</Link>
       <p role="status">
         {data.pagination.total === 0
           ? 'No Entries Found'

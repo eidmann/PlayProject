@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router';
 import { EntryListPage } from './pages/EntryListPage';
 import { EntryDetailPage } from './pages/EntryDetailPage';
 import { EntryFormPage } from './pages/EntryFormPage';
+import { MoodHistoryPage } from './pages/MoodHistoryPage';
 
 export function App() {
   return (
@@ -13,6 +14,7 @@ export function App() {
         <Route path="/entries/new" element={<EntryFormPage />} />
         <Route path="/entries/:id/edit" element={<EntryFormPage />} />
         <Route path="/entries/:id" element={<EntryDetailPage />} />
+        <Route path="/moods" element={<MoodHistoryPage />} />
       </Routes>
     </main>
   );

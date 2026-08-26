@@ -10,6 +10,19 @@ const entryResponseSchema = z.object({
   updatedAt: z.string(),
   title: z.string(),
   content: z.string(),
+  mood: z.enum(['GREAT', 'GOOD', 'OKAY', 'LOW', 'BAD']).nullable(),
+});
+
+const moodResponseSchema = z
+  .object({
+    id: z.string(),
+    createdAt: z.string(),
+    mood: z.enum(['GREAT', 'GOOD', 'OKAY', 'LOW', 'BAD']),
+  })
+  .strict();
+
+const listMoodsResponseSchema = z.object({
+  data: z.array(moodResponseSchema),
 });
 
 const paginatedEntriesResponseSchema = z.object({
@@ -41,6 +54,7 @@ describe('POST /api/entries', () => {
     const response = await request(createApp()).post('/api/entries').send({
       title: 'Test Entry',
       content: 'This is a test entry',
+      mood: 'GOOD',
     });
 
     expect(response.status).toBe(201);
@@ -49,12 +63,54 @@ describe('POST /api/entries', () => {
 
     expect(entry.title).toBe('Test Entry');
     expect(entry.content).toBe('This is a test entry');
+    expect(entry.mood).toBe('GOOD');
+  });
+
+  it('responds with 201 and the created entry with no mood', async () => {
+    const response = await request(createApp()).post('/api/entries').send({
+      title: 'Test Entry',
+      content: 'This is a test entry',
+    });
+
+    expect(response.status).toBe(201);
+
+    const entry = entryResponseSchema.parse(response.body);
+
+    expect(entry.title).toBe('Test Entry');
+    expect(entry.content).toBe('This is a test entry');
+    expect(entry.mood).toBeNull();
   });
 
   it('returns 400 if the request body is invalid', async () => {
     const response = await request(createApp()).post('/api/entries').send({
       title: '',
       content: '',
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid request body',
+    });
+  });
+
+  it('returns 400 if the request mood is not a valid mood', async () => {
+    const response = await request(createApp()).post('/api/entries').send({
+      title: 'Test Entry',
+      content: 'This is a test entry',
+      mood: 'ecstatic',
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid request body',
+    });
+  });
+
+  it('returns 400 if the request mood is number', async () => {
+    const response = await request(createApp()).post('/api/entries').send({
+      title: 'Test Entry',
+      content: 'This is a test entry',
+      mood: 3,
     });
 
     expect(response.status).toBe(400);
@@ -82,20 +138,20 @@ describe('POST /api/entries', () => {
 
 describe('GET /api/entries/:id', () => {
   it('returns 200 OK and the entry if it exists in the DB', async () => {
-    const createdEntry = await prisma.journalEntry.create({
-      data: {
-        title: 'Test Entry',
-        content: 'Test Content',
-      },
+    const createdEntry = await request(createApp()).post('/api/entries').send({
+      title: 'Test Entry',
+      content: 'This is a test entry',
+      mood: 'GOOD',
     });
-    expect(createdEntry.title).toBe('Test Entry');
-    expect(createdEntry.content).toBe('Test Content');
-    const response = await request(createApp()).get(`/api/entries/${createdEntry.id}`);
+    expect(createdEntry.status).toBe(201);
+    const parsedEntry = entryResponseSchema.parse(createdEntry.body);
+    const response = await request(createApp()).get(`/api/entries/${parsedEntry.id}`);
     expect(response.status).toBe(200);
     const parsedResponse = entryResponseSchema.parse(response.body);
-    expect(parsedResponse.id).toBe(createdEntry.id);
+    expect(parsedResponse.id).toBe(parsedEntry.id);
     expect(parsedResponse.title).toBe('Test Entry');
-    expect(parsedResponse.content).toBe('Test Content');
+    expect(parsedResponse.content).toBe('This is a test entry');
+    expect(parsedResponse.mood).toBe('GOOD');
   });
 
   it('returns 404 not found in DB', async () => {
@@ -286,6 +342,31 @@ describe('PUT /api/entries/:id', () => {
     const createdEntry = await request(createApp()).post('/api/entries').send({
       title: 'Test Entry',
       content: 'Test Content',
+      mood: 'GREAT',
+    });
+    expect(createdEntry.status).toBe(201);
+    const parsedEntry = entryResponseSchema.parse(createdEntry.body);
+    const response = await request(createApp()).put(`/api/entries/${parsedEntry.id}`).send({
+      title: 'Updated Title',
+      content: 'Updated Content',
+      mood: null,
+    });
+    expect(response.status).toBe(200);
+    const parsedResponse = entryResponseSchema.parse(response.body);
+    expect(parsedResponse.title).toBe('Updated Title');
+    expect(parsedResponse.content).toBe('Updated Content');
+    expect(parsedResponse.mood).toBeNull();
+    expect(parsedResponse.id).toBe(parsedEntry.id);
+    expect(new Date(parsedResponse.updatedAt).getTime()).toBeGreaterThan(
+      new Date(parsedEntry.updatedAt).getTime(),
+    );
+  });
+
+  it('updates mood to null if not provided', async () => {
+    const createdEntry = await request(createApp()).post('/api/entries').send({
+      title: 'Test Entry',
+      content: 'Test Content',
+      mood: 'GREAT',
     });
     expect(createdEntry.status).toBe(201);
     const parsedEntry = entryResponseSchema.parse(createdEntry.body);
@@ -295,12 +376,25 @@ describe('PUT /api/entries/:id', () => {
     });
     expect(response.status).toBe(200);
     const parsedResponse = entryResponseSchema.parse(response.body);
-    expect(parsedResponse.title).toBe('Updated Title');
-    expect(parsedResponse.content).toBe('Updated Content');
-    expect(parsedResponse.id).toBe(parsedEntry.id);
-    expect(new Date(parsedResponse.updatedAt).getTime()).toBeGreaterThan(
-      new Date(parsedEntry.updatedAt).getTime(),
-    );
+    expect(parsedResponse.mood).toBeNull();
+  });
+
+  it('updates mood to new value if provided', async () => {
+    const createdEntry = await request(createApp()).post('/api/entries').send({
+      title: 'Test Entry',
+      content: 'Test Content',
+      mood: 'GREAT',
+    });
+    expect(createdEntry.status).toBe(201);
+    const parsedEntry = entryResponseSchema.parse(createdEntry.body);
+    const response = await request(createApp()).put(`/api/entries/${parsedEntry.id}`).send({
+      title: 'Updated Title',
+      content: 'Updated Content',
+      mood: 'GOOD',
+    });
+    expect(response.status).toBe(200);
+    const parsedResponse = entryResponseSchema.parse(response.body);
+    expect(parsedResponse.mood).toBe('GOOD');
   });
 
   it('returns 404 not found if the ID is not found in the DB', async () => {
@@ -318,6 +412,30 @@ describe('PUT /api/entries/:id', () => {
     const response = await request(createApp()).put('/api/entries/123').send({
       title: '',
       content: '',
+    });
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid request body',
+    });
+  });
+
+  it('returns 400 bad request if the request mood is number', async () => {
+    const response = await request(createApp()).put('/api/entries/123').send({
+      title: 'Test Entry',
+      content: 'Test Content',
+      mood: 3,
+    });
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid request body',
+    });
+  });
+
+  it('returns 400 bad request if the request mood is not a valid mood', async () => {
+    const response = await request(createApp()).put('/api/entries/123').send({
+      title: 'Test Entry',
+      content: 'Test Content',
+      mood: 'ecstatic',
     });
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
@@ -345,5 +463,128 @@ describe('PUT /api/entries/:id', () => {
     expect(new Date(parsedResponse.updatedAt).getTime()).toBeGreaterThan(
       new Date(parsedEntry.updatedAt).getTime(),
     );
+  });
+});
+
+describe('GET /api/moods', () => {
+  beforeEach(async () => {
+    await Promise.all([
+      prisma.journalEntry.create({
+        data: {
+          title: 'Oldest',
+          content: 'First Entry',
+          mood: 'GREAT',
+          createdAt: new Date('2026-01-01T10:00:00.000Z'),
+        },
+      }),
+      prisma.journalEntry.create({
+        data: {
+          title: 'Middle',
+          content: 'Second Entry',
+          mood: 'GOOD',
+          createdAt: new Date('2026-01-02T10:00:00.000Z'),
+        },
+      }),
+      prisma.journalEntry.create({
+        data: {
+          title: 'Second Newest',
+          content: 'Third Entry',
+          mood: null,
+          createdAt: new Date('2026-01-03T10:00:00.000Z'),
+        },
+      }),
+      prisma.journalEntry.create({
+        data: {
+          title: 'Newest',
+          content: 'Fourth Entry',
+          mood: 'BAD',
+          createdAt: new Date('2026-01-04T10:00:00.000Z'),
+        },
+      }),
+    ]);
+  });
+
+  it('returns 200 ok and the moods if they exist', async () => {
+    const response = await request(createApp()).get('/api/moods');
+    expect(response.status).toBe(200);
+    const parsedResponse = listMoodsResponseSchema.parse(response.body);
+    expect(parsedResponse.data).toHaveLength(3);
+    expect(parsedResponse.data.map((entry) => entry.mood)).toEqual(['GREAT', 'GOOD', 'BAD']);
+  });
+
+  it('returns moods between from and to dates if provided', async () => {
+    const response = await request(createApp()).get(
+      '/api/moods?from=2026-01-01T10:00:00.000Z&to=2026-01-02T10:00:00.000Z',
+    );
+    expect(response.status).toBe(200);
+    const parsedResponse = listMoodsResponseSchema.parse(response.body);
+    expect(parsedResponse.data).toHaveLength(2);
+    expect(parsedResponse.data.map((entry) => entry.createdAt)).toEqual([
+      '2026-01-01T10:00:00.000Z',
+      '2026-01-02T10:00:00.000Z',
+    ]);
+    expect(parsedResponse.data.map((entry) => entry.mood)).toEqual(['GREAT', 'GOOD']);
+  });
+
+  it('returns moods from start date if only from is provided', async () => {
+    const response = await request(createApp()).get('/api/moods?from=2026-01-01T10:00:00.000Z');
+    expect(response.status).toBe(200);
+    const parsedResponse = listMoodsResponseSchema.parse(response.body);
+    expect(parsedResponse.data).toHaveLength(3);
+    expect(parsedResponse.data.map((entry) => entry.createdAt)).toEqual([
+      '2026-01-01T10:00:00.000Z',
+      '2026-01-02T10:00:00.000Z',
+      '2026-01-04T10:00:00.000Z',
+    ]);
+    expect(parsedResponse.data.map((entry) => entry.mood)).toEqual(['GREAT', 'GOOD', 'BAD']);
+  });
+
+  it('returns moods to end date if only to is provided', async () => {
+    const response = await request(createApp()).get('/api/moods?to=2026-01-02T10:00:00.000Z');
+    expect(response.status).toBe(200);
+    const parsedResponse = listMoodsResponseSchema.parse(response.body);
+    expect(parsedResponse.data).toHaveLength(2);
+    expect(parsedResponse.data.map((entry) => entry.createdAt)).toEqual([
+      '2026-01-01T10:00:00.000Z',
+      '2026-01-02T10:00:00.000Z',
+    ]);
+    expect(parsedResponse.data.map((entry) => entry.mood)).toEqual(['GREAT', 'GOOD']);
+  });
+
+  it('returns 400 bad request if from is not a valid date', async () => {
+    const response = await request(createApp()).get(
+      '/api/moods?from=abc&to=2026-01-02T10:00:00.000Z',
+    );
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid query parameters',
+    });
+  });
+
+  it('returns 400 bad request if to is not a valid date', async () => {
+    const response = await request(createApp()).get(
+      '/api/moods?from=2026-01-01T10:00:00.000Z&to=abc',
+    );
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid query parameters',
+    });
+  });
+
+  it('returns 400 bad request if from is greater than to', async () => {
+    const response = await request(createApp()).get(
+      '/api/moods?from=2026-01-02T10:00:00.000Z&to=2026-01-01T10:00:00.000Z',
+    );
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: 'Invalid query parameters',
+    });
+  });
+  it('returns 200 and empty array if no moods exist', async () => {
+    await prisma.journalEntry.deleteMany();
+    const response = await request(createApp()).get('/api/moods');
+    expect(response.status).toBe(200);
+    const parsedResponse = listMoodsResponseSchema.parse(response.body);
+    expect(parsedResponse.data).toHaveLength(0);
   });
 });

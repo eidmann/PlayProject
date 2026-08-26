@@ -1,9 +1,11 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import type { Mood } from '../types/moodType';
 
 export type JournalEntry = {
   id: string;
   title: string;
   content: string;
+  mood: Mood;
   createdAt: string;
   updatedAt: string;
 };
@@ -13,6 +15,15 @@ export type PaginatedEntries = {
   pagination: { page: number; limit: number; total: number; totalPages: number };
 };
 
+export type MoodHistory = {
+  id: string;
+  createdAt: string;
+  mood: Exclude<Mood, null>;
+};
+
+export type MoodHistoryList = {
+  data: MoodHistory[];
+};
 export const entriesApi = createApi({
   reducerPath: 'entriesApi',
   baseQuery: fetchBaseQuery({ baseUrl: '/api' }),
@@ -29,7 +40,7 @@ export const entriesApi = createApi({
       query: (id) => `/entries/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Entry', id }],
     }),
-    createEntry: builder.mutation<JournalEntry, { title: string; content: string }>({
+    createEntry: builder.mutation<JournalEntry, { title: string; content: string; mood: Mood }>({
       query: (body) => ({
         url: '/entries',
         method: 'POST',
@@ -37,11 +48,14 @@ export const entriesApi = createApi({
       }),
       invalidatesTags: ['Entry'],
     }),
-    updateEntry: builder.mutation<JournalEntry, { id: string; title: string; content: string }>({
-      query: ({ id, title, content }) => ({
+    updateEntry: builder.mutation<
+      JournalEntry,
+      { id: string; title: string; content: string; mood: Mood }
+    >({
+      query: ({ id, title, content, mood }) => ({
         url: `/entries/${id}`,
         method: 'PUT',
-        body: { title, content },
+        body: { title, content, mood },
       }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Entry', id }, 'Entry'],
     }),
@@ -52,6 +66,13 @@ export const entriesApi = createApi({
       }),
       invalidatesTags: (_result, _error, id) => [{ type: 'Entry', id }, 'Entry'],
     }),
+    getMoodHistory: builder.query<MoodHistoryList, void>({
+      query: () => ({
+        url: '/moods',
+        method: 'GET',
+      }),
+      providesTags: ['Entry'],
+    }),
   }),
 });
 
@@ -61,4 +82,5 @@ export const {
   useCreateEntryMutation,
   useUpdateEntryMutation,
   useDeleteEntryMutation,
+  useGetMoodHistoryQuery,
 } = entriesApi;
