@@ -101,16 +101,17 @@ npm run dev          # starts backend (:3001) and frontend (:5173) together
 
 ## Current state (handoff for agents)
 
-**Active milestone: 4** — mood tracking, strictly test-first. See [docs/LEARNING_PATH.md](docs/LEARNING_PATH.md). Do not rebuild the journal UI.
+**Active milestone: 5** — AI-generated summaries and weekly insights. See [docs/LEARNING_PATH.md](docs/LEARNING_PATH.md). Do not rebuild the journal UI or mood tracking.
 
 | Area                 | Status                                                                                                              |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | Backend journal CRUD | Done: `POST/GET/PUT/DELETE /api/entries`, paginated `GET /api/entries`, central JSON 500 middleware                 |
 | Backend tests        | Vitest + Supertest in `backend/src/test/`; setup switches Prisma to Neon **test** branch                            |
 | Frontend journal UI  | Done: list, detail, create, edit, delete via RTK Query + React Router; RTL tests in `frontend/src/pages/*.test.tsx` |
-| Auth / OpenAI / mood | Not started (milestones 4–6)                                                                                        |
+| Mood tracking        | Done: nullable `Mood` enum on entries, `GET /api/moods`, form picker, detail, history page (`/moods`)               |
+| Auth / OpenAI        | Not started (milestones 5–6)                                                                                        |
 
-Vite still proxies `/api` → backend `:3001`. Routes live in `frontend/src/App.tsx` (`/` list, `/entries/new`, `/entries/:id/edit` **before** `/entries/:id`).
+Vite still proxies `/api` → backend `:3001`. Routes live in `frontend/src/App.tsx` (`/` list, `/entries/new`, `/entries/:id/edit` **before** `/entries/:id`, `/moods` history).
 
 ### Conventions established in milestones 1–2 (do not reinvent)
 
@@ -118,7 +119,7 @@ Vite still proxies `/api` → backend `:3001`. Routes live in `frontend/src/App.
 - **Query params are strings** until `z.coerce.number()` (etc.). Defaults live on the query schema.
 - **Errors:** `400` + `{ error: 'Invalid request body' }` or `'Invalid query parameters'` (optional `fields`); `404` + `{ error: 'Entry not found' }`; unexpected → middleware `500` + `{ error: 'Internal server error' }`.
 - **Prisma `P2025`** (update/delete missing row) → map to 404; rethrow anything else into the error middleware.
-- **Mass assignment:** input schemas allow only client-owned fields (`title`, `content`); never accept `id` / timestamps from the client.
+- **Mass assignment:** input schemas allow only client-owned fields (`title`, `content`, `mood`); never accept `id` / timestamps from the client.
 - **List pagination:** `{ data, pagination: { page, limit, total, totalPages } }`; defaults `page=1`, `limit=10`, max limit 100; sort `createdAt desc`, `id desc`; empty DB → `totalPages: 0`; page past end → `200` + `data: []` with real `total`/`totalPages`.
 - **Tests:** resource-focused file `journalEntries.test.ts`; assert status before parsing body; restore Vitest mocks in `afterEach`; Neon may need waking if `$connect` fails.
 
@@ -127,15 +128,41 @@ Vite still proxies `/api` → backend `:3001`. Routes live in `frontend/src/App.
 - **Server vs client state:** RTK Query owns fetched journal data (`frontend/src/api/entriesApi.ts`, `baseUrl: '/api'`). Form drafts stay in local `useState` (`EntryFormFields`). Do not add a `createSlice` for entries.
 - **Cache tags:** list `providesTags: ['Entry']`; detail `{ type: 'Entry', id }`. Create invalidates `'Entry'`; update/delete invalidate both the specific id and `'Entry'`.
 - **DELETE is 204:** empty body — treat success as `!('error' in result)`, not `result.data`.
-- **Edit form prefill:** do not mount `EntryFormFields` until GET has data, or `initialTitle`/`initialContent` never update (local state is initialized once).
+- **Edit form prefill:** do not mount `EntryFormFields` until GET has data, or `initialTitle`/`initialContent`/`initialMood` never update (local state is initialized once).
 - **Tests:** `renderWithProviders` (fresh store + `MemoryRouter`). Stub `globalThis.fetch`; RTK passes a `Request`, so use `getFetchUrl` / `getRequestBody` — do not assume the first argument is a string. Spy `window.confirm` **before** the click (happy-dom has no `confirm`). Keep in-memory entry state **outside** the `vi.fn` so PUT then GET sees updates.
 - **`useParams` in tests:** the rendered tree must include a matching `<Route>`, and `initialEntries` must be a real URL (`/entries/abc/edit`), not the pattern `/entries/:id/edit`.
 
+### Conventions established in milestone 4 (do not reinvent)
+
+- **Mood is a Prisma enum on `JournalEntry`, not a table:** `GREAT | GOOD | OKAY | LOW | BAD`, nullable. No `UNDEFINED` sentinel. Migration lives under `backend/prisma/migrations/`.
+- **`schema.prisma` `url` / `directUrl` stay `DATABASE_URL` / `DIRECT_URL`.** Tests switch via `backend/src/test/setup.ts`. Never point the schema at `TEST_*`.
+- **PUT is full replace.** Omitted `mood` becomes `null`. Prisma `undefined` **skips** the field, so the handler must pass `mood ?? null` (same on POST). Invalid mood → `400` + `Invalid request body`.
+- **History:** `GET /api/moods?from=&to=` (optional ISO datetimes, `from <= to`). Oldest first (`createdAt`/`id` asc). Skip null moods. Shape `{ data: [{ id, createdAt, mood }] }` — not a bare array. Frontend `getMoodHistory` `providesTags: ['Entry']` so create/update/delete refetch it.
+- **UI surfaces:** mood on **form + detail + history**, **not** on the list (list links to `/moods`). Detail shows `N/A` when mood is null.
+- **Select vs JSON:** `<select value="">` for “No mood”; React/API use `null`. Never `value="null"` (that is the string `"null"`). Narrow with a switch/`parseMood`, not `as Mood`.
+- **Client must always send `mood` on PUT.** Title-only edits that omit the field wipe the stored mood. Cover this with a frontend test; the backend test that omitted mood becomes `null` is a different contract.
+- **Test isolation:** do not share a mutable in-memory `entry` across tests — PUT mutates it and the next test prefills leftover state. Keep fixtures inside each test (or reset in `afterEach`). A plain `<li>` has **no accessible name** from its text; query history by text (or `aria-label`), not `getByRole('listitem', { name: /GOOD/ })`.
+- **Prisma + TypeScript 7:** `PrismaClientKnownRequestError` is imported from `@prisma/client/runtime/library.js` (not a `Prisma.` namespace) because of `verbatimModuleSyntax`. If the editor shows implicit `any` on Prisma callbacks but `npm run typecheck` is clean, the IDE is on a different TypeScript than `backend` (pin `typescript.tsdk` to `backend/node_modules/typescript/lib`).
+
 ### After original milestones
 
-Known gaps to pick up after milestones 4–7, unless a later milestone forces them sooner:
+Known gaps to pick up after milestones 5–7, unless a later milestone forces them sooner:
+
+**Architecture**
 
 - **No Zod on frontend JSON.** `entriesApi` types trust the network. Parse responses (and optionally mutation bodies) with Zod at the RTK Query boundary so untrusted JSON is not passed through as typed data.
-- **List errors are hardcoded.** `EntryListPage` shows `"Error loading entries"`; detail/form use `getApiErrorMessage`. Use the API message (with a fallback) on the list too.
+- **Mood enum is copied in five places.** Prisma `enum Mood`, Zod `.enum([...])`, `frontend/src/types/moodType.ts`, `parseMood` in `EntryFormFields`, and `MOOD_VALUES` in `fetchTestUtils`. One source of truth (shared module or generated from Prisma) so adding a value cannot drift.
 - **Backend routes still live in `app.ts`.** Extract route → service when it starts to hurt (likely around auth in milestone 6).
+
+**Product / UI**
+
+- **List errors are hardcoded.** `EntryListPage` shows `"Error loading entries"`; detail/form use `getApiErrorMessage`. Use the API message (with a fallback) on the list too.
 - **UI is unstyled.** Tailwind is installed; pages are functional, not laid out. Polish after the product features exist.
+- **Mood history has no date-range UI.** `GET /api/moods` already accepts `from` / `to`; the page fetches the full list. Add a filter once insights/charts need a window.
+- **Raw enum and ISO timestamps.** Detail and history show `GOOD` and `2026-01-01T00:00:00.000Z`. Friendlier labels (“Good”) and formatted dates belong in polish, not another data-model change.
+- **History list items have no accessible name.** Fine with `getByText`; add `aria-label` if we want `getByRole('listitem', { name })` or a screen-reader-friendly summary.
+
+**Tests / cleanup**
+
+- **POST `{ mood: null }` is equivalent to omitting the key** (`mood ?? null`) but only omit is asserted on the backend. Optional extra case, not a product hole.
+- **`GET /api/moods` filters after `mood: { not: null }`.** Runtime is redundant; the `.filter` exists to narrow Prisma’s `Mood | null`. A type predicate would make that intent obvious.

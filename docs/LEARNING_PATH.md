@@ -2,9 +2,9 @@
 
 This is the curriculum. Each milestone pairs concepts to study with a real MindLog feature the student builds. A milestone is complete only when its Definition of Done is met and the student can explain every design decision.
 
-**Active milestone: 4**
+**Active milestone: 5**
 
-Milestones 1–3 are complete (journal entry API + journal UI with RTK Query). Next: mood tracking, test-first.
+Milestones 1–4 are complete (journal API + UI + mood tracking). Next: AI-generated summaries, with the OpenAI client behind a testable boundary.
 
 ---
 
@@ -60,20 +60,29 @@ Known polish deferred to [README — After original milestones](../README.md#aft
 
 ---
 
-## Milestone 4 — Testing depth — ACTIVE
+## Milestone 4 — Testing depth — DONE
 
 **Feature: mood tracking (mood on each entry, mood history view).**
 
-- TDD as a design tool: letting the test shape the API
-- Test doubles: mock, stub, fake, spy — and when each is a smell
-- Unit vs integration tests: what each is for, the testing trophy
-- Testing the database layer: test database strategy, per-test isolation
+Shipped:
 
-Exercise: build mood tracking end-to-end (schema migration, API, UI) strictly test-first. The mentor reviews the tests before the implementation.
+- Prisma `Mood` enum (`GREAT | GOOD | OKAY | LOW | BAD`), nullable on `JournalEntry`; migration applied to the schema
+- POST/PUT: `mood` optional; omit or `null` → stored `null`; invalid value → `400` + `Invalid request body`
+- PUT is **full replace** — handler passes `mood ?? null` so Prisma does not skip the field
+- `GET /api/moods?from=&to=` (optional ISO, `from <= to`): oldest first, skip null moods, `{ data: [{ id, createdAt, mood }] }`
+- UI: mood picker on create/edit (`""` in the `<select>`, `null` in JSON); detail shows mood or `N/A`; list does **not** show mood; `MoodHistoryPage` at `/moods`
+- Frontend PUT always sends current `mood` so a title-only edit cannot wipe it
+- Tests: backend CRUD + history filters; frontend create/edit/keep/clear mood, detail, list absence, history empty/loading/error
+
+Concepts practiced: TDD as API design, test doubles (fetch stub vs in-memory fake), unit vs integration (Supertest + Neon vs RTL + stubbed `fetch`), per-test isolation (no shared mutable fixtures).
+
+Definition of Done: README checklist + student can explain picker → RTK Query → Zod/Prisma → history query, and why omitted PUT `mood` is `null` while the client must still send the field.
+
+Known polish deferred to [README — After original milestones](../README.md#after-original-milestones): duplicated Mood unions, no history date-range UI, raw enum/ISO copy.
 
 ---
 
-## Milestone 5 — AI integration done right
+## Milestone 5 — AI integration done right — ACTIVE
 
 **Feature: AI-generated entry summaries and weekly insights.**
 
@@ -83,7 +92,7 @@ Exercise: build mood tracking end-to-end (schema migration, API, UI) strictly te
 - Testing code that calls an LLM: injecting the client, mocking responses, contract boundaries
 - Streaming responses to the browser (optional stretch)
 
-Exercise: `POST /api/entries/:id/summarize` and a weekly insights endpoint, with the OpenAI client wrapped behind an interface the tests can fake.
+Exercise: `POST /api/entries/:id/summarize` and a weekly insights endpoint, with the OpenAI client wrapped behind an interface the tests can fake. Reuse the existing journal + mood model — do not invent a second mood type or rebuild the history page. Mood-over-time charts belong on the post-curriculum list unless this milestone’s insights UI needs a window (then use `GET /api/moods?from=&to=`).
 
 ---
 
@@ -124,3 +133,4 @@ Exercise: build the chosen feature with AI writing a significant portion — but
 - [ ] I catch AI mistakes during review (log examples when it happens)
 - [ ] I know the _why_ behind each tool in the stack, not just the how
 - [ ] I can design a small feature (API shape, data model, UI state) on paper before coding
+- [ ] I can explain the difference between omitting a JSON field, sending `null`, and Prisma `undefined` (skip vs set)
