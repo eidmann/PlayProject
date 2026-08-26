@@ -1,8 +1,9 @@
 import 'dotenv/config';
 import { createApp } from './app.js';
+import { parseConfig } from './config.js';
 
-const port = Number(process.env['PORT'] ?? 3001);
+const config = parseConfig(process.env);
 
-createApp().listen(port, () => {
-  console.log(`MindLog API listening on http://localhost:${port}`);
+createApp().listen(config.PORT, () => {
+  console.log(`MindLog API listening on http://localhost:${config.PORT}`);
 });
