@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
-import { createApp } from '../app.js';
+import { createTestApp } from './createTestApp.js';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 
@@ -51,7 +51,7 @@ afterAll(async () => {
 
 describe('POST /api/entries', () => {
   it('responds with 201 and the created entry', async () => {
-    const response = await request(createApp()).post('/api/entries').send({
+    const response = await request(createTestApp()).post('/api/entries').send({
       title: 'Test Entry',
       content: 'This is a test entry',
       mood: 'GOOD',
@@ -67,7 +67,7 @@ describe('POST /api/entries', () => {
   });
 
   it('responds with 201 and the created entry with no mood', async () => {
-    const response = await request(createApp()).post('/api/entries').send({
+    const response = await request(createTestApp()).post('/api/entries').send({
       title: 'Test Entry',
       content: 'This is a test entry',
     });
@@ -82,7 +82,7 @@ describe('POST /api/entries', () => {
   });
 
   it('returns 400 if the request body is invalid', async () => {
-    const response = await request(createApp()).post('/api/entries').send({
+    const response = await request(createTestApp()).post('/api/entries').send({
       title: '',
       content: '',
     });
@@ -94,7 +94,7 @@ describe('POST /api/entries', () => {
   });
 
   it('returns 400 if the request mood is not a valid mood', async () => {
-    const response = await request(createApp()).post('/api/entries').send({
+    const response = await request(createTestApp()).post('/api/entries').send({
       title: 'Test Entry',
       content: 'This is a test entry',
       mood: 'ecstatic',
@@ -107,7 +107,7 @@ describe('POST /api/entries', () => {
   });
 
   it('returns 400 if the request mood is number', async () => {
-    const response = await request(createApp()).post('/api/entries').send({
+    const response = await request(createTestApp()).post('/api/entries').send({
       title: 'Test Entry',
       content: 'This is a test entry',
       mood: 3,
@@ -120,7 +120,7 @@ describe('POST /api/entries', () => {
   });
 
   it('does not accept id in the request body', async () => {
-    const response = await request(createApp()).post('/api/entries').send({
+    const response = await request(createTestApp()).post('/api/entries').send({
       id: 'hacker-chosen',
       title: 'Test Entry',
       content: 'This is a test entry',
@@ -138,14 +138,14 @@ describe('POST /api/entries', () => {
 
 describe('GET /api/entries/:id', () => {
   it('returns 200 OK and the entry if it exists in the DB', async () => {
-    const createdEntry = await request(createApp()).post('/api/entries').send({
+    const createdEntry = await request(createTestApp()).post('/api/entries').send({
       title: 'Test Entry',
       content: 'This is a test entry',
       mood: 'GOOD',
     });
     expect(createdEntry.status).toBe(201);
     const parsedEntry = entryResponseSchema.parse(createdEntry.body);
-    const response = await request(createApp()).get(`/api/entries/${parsedEntry.id}`);
+    const response = await request(createTestApp()).get(`/api/entries/${parsedEntry.id}`);
     expect(response.status).toBe(200);
     const parsedResponse = entryResponseSchema.parse(response.body);
     expect(parsedResponse.id).toBe(parsedEntry.id);
@@ -155,7 +155,7 @@ describe('GET /api/entries/:id', () => {
   });
 
   it('returns 404 not found in DB', async () => {
-    const response = await request(createApp()).get('/api/entries/123');
+    const response = await request(createTestApp()).get('/api/entries/123');
     expect(response.status).toBe(404);
     expect(response.body).toMatchObject({
       error: 'Entry not found',
@@ -165,19 +165,19 @@ describe('GET /api/entries/:id', () => {
 
 describe('DELETE /api/entries/:id', () => {
   it('returns 204 no content if the entry is deleted', async () => {
-    const createdEntry = await request(createApp()).post('/api/entries').send({
+    const createdEntry = await request(createTestApp()).post('/api/entries').send({
       title: 'Test Entry',
       content: 'Test Content',
     });
     expect(createdEntry.status).toBe(201);
     const entry = entryResponseSchema.parse(createdEntry.body);
-    const response = await request(createApp()).delete(`/api/entries/${entry.id}`);
+    const response = await request(createTestApp()).delete(`/api/entries/${entry.id}`);
     expect(response.status).toBe(204);
     const deletedEntry = await prisma.journalEntry.findUnique({
       where: { id: entry.id },
     });
     expect(deletedEntry).toBeNull();
-    const deletedResponse = await request(createApp()).get(`/api/entries/${entry.id}`);
+    const deletedResponse = await request(createTestApp()).get(`/api/entries/${entry.id}`);
     expect(deletedResponse.status).toBe(404);
     expect(deletedResponse.body).toMatchObject({
       error: 'Entry not found',
@@ -185,7 +185,9 @@ describe('DELETE /api/entries/:id', () => {
   });
 
   it('returns 404 not found if the entry is not in the DB', async () => {
-    const response = await request(createApp()).delete('/api/entries/cmsnjq5dv0001uobwroj7sag3');
+    const response = await request(createTestApp()).delete(
+      '/api/entries/cmsnjq5dv0001uobwroj7sag3',
+    );
     expect(response.status).toBe(404);
     expect(response.body).toMatchObject({
       error: 'Entry not found',
@@ -198,7 +200,7 @@ describe('error middleware', () => {
     vi.spyOn(prisma.journalEntry, 'findUnique').mockRejectedValueOnce(
       new Error('database exploded'),
     );
-    const response = await request(createApp()).get('/api/entries/any-id');
+    const response = await request(createTestApp()).get('/api/entries/any-id');
     expect(response.status).toBe(500);
     expect(response.body).toMatchObject({
       error: 'Internal server error',
@@ -234,7 +236,7 @@ describe('GET /api/entries', () => {
   });
 
   it('returns 200 OK and the entries from the DB if they exist', async () => {
-    const response = await request(createApp()).get('/api/entries');
+    const response = await request(createTestApp()).get('/api/entries');
     expect(response.status).toBe(200);
     const parsedResponse = paginatedEntriesResponseSchema.parse(response.body);
     expect(parsedResponse.data).toHaveLength(3);
@@ -246,7 +248,7 @@ describe('GET /api/entries', () => {
   });
 
   it('returns 200 OK and the second page when limit is 2', async () => {
-    const response = await request(createApp()).get('/api/entries?page=2&limit=2');
+    const response = await request(createTestApp()).get('/api/entries?page=2&limit=2');
     expect(response.status).toBe(200);
     const parsedResponse = paginatedEntriesResponseSchema.parse(response.body);
     expect(parsedResponse.data).toHaveLength(1);
@@ -258,7 +260,7 @@ describe('GET /api/entries', () => {
   });
 
   it('returns 200 OK and empty array if the page is greater than the total pages', async () => {
-    const response = await request(createApp()).get('/api/entries?page=20&limit=2');
+    const response = await request(createTestApp()).get('/api/entries?page=20&limit=2');
     expect(response.status).toBe(200);
     const parsedResponse = paginatedEntriesResponseSchema.parse(response.body);
     expect(parsedResponse.data).toHaveLength(0);
@@ -269,7 +271,7 @@ describe('GET /api/entries', () => {
   });
 
   it('returns 400 bad request if page is less than 1', async () => {
-    const response = await request(createApp()).get('/api/entries?page=0&limit=2');
+    const response = await request(createTestApp()).get('/api/entries?page=0&limit=2');
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       error: 'Invalid query parameters',
@@ -277,7 +279,7 @@ describe('GET /api/entries', () => {
   });
 
   it('returns 400 bad request if page is not a number', async () => {
-    const response = await request(createApp()).get('/api/entries?page=abc&limit=2');
+    const response = await request(createTestApp()).get('/api/entries?page=abc&limit=2');
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       error: 'Invalid query parameters',
@@ -285,7 +287,7 @@ describe('GET /api/entries', () => {
   });
 
   it('returns 400 bad request if limit is not a number', async () => {
-    const response = await request(createApp()).get('/api/entries?page=1&limit=abc');
+    const response = await request(createTestApp()).get('/api/entries?page=1&limit=abc');
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       error: 'Invalid query parameters',
@@ -293,7 +295,7 @@ describe('GET /api/entries', () => {
   });
 
   it('returns 400 bad request if limit is less than 1', async () => {
-    const response = await request(createApp()).get('/api/entries?page=1&limit=0');
+    const response = await request(createTestApp()).get('/api/entries?page=1&limit=0');
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       error: 'Invalid query parameters',
@@ -301,7 +303,7 @@ describe('GET /api/entries', () => {
   });
 
   it('returns 400 bad request if limit is greater than 100', async () => {
-    const response = await request(createApp()).get('/api/entries?page=1&limit=101');
+    const response = await request(createTestApp()).get('/api/entries?page=1&limit=101');
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       error: 'Invalid query parameters',
@@ -309,7 +311,7 @@ describe('GET /api/entries', () => {
   });
 
   it('returns 400 bad request if page is not an integer', async () => {
-    const response = await request(createApp()).get('/api/entries?page=1.5&limit=2');
+    const response = await request(createTestApp()).get('/api/entries?page=1.5&limit=2');
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       error: 'Invalid query parameters',
@@ -317,7 +319,7 @@ describe('GET /api/entries', () => {
   });
 
   it('returns 400 bad request if limit is not an integer', async () => {
-    const response = await request(createApp()).get('/api/entries?page=1&limit=2.5');
+    const response = await request(createTestApp()).get('/api/entries?page=1&limit=2.5');
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       error: 'Invalid query parameters',
@@ -326,7 +328,7 @@ describe('GET /api/entries', () => {
 
   it('returns empty list when no entries exist', async () => {
     await prisma.journalEntry.deleteMany();
-    const response = await request(createApp()).get('/api/entries?page=1&limit=10');
+    const response = await request(createTestApp()).get('/api/entries?page=1&limit=10');
     expect(response.status).toBe(200);
     const parsedResponse = paginatedEntriesResponseSchema.parse(response.body);
     expect(parsedResponse.data).toHaveLength(0);
@@ -339,14 +341,14 @@ describe('GET /api/entries', () => {
 
 describe('PUT /api/entries/:id', () => {
   it('returns 200 OK and the updated entry if successful', async () => {
-    const createdEntry = await request(createApp()).post('/api/entries').send({
+    const createdEntry = await request(createTestApp()).post('/api/entries').send({
       title: 'Test Entry',
       content: 'Test Content',
       mood: 'GREAT',
     });
     expect(createdEntry.status).toBe(201);
     const parsedEntry = entryResponseSchema.parse(createdEntry.body);
-    const response = await request(createApp()).put(`/api/entries/${parsedEntry.id}`).send({
+    const response = await request(createTestApp()).put(`/api/entries/${parsedEntry.id}`).send({
       title: 'Updated Title',
       content: 'Updated Content',
       mood: null,
@@ -363,14 +365,14 @@ describe('PUT /api/entries/:id', () => {
   });
 
   it('updates mood to null if not provided', async () => {
-    const createdEntry = await request(createApp()).post('/api/entries').send({
+    const createdEntry = await request(createTestApp()).post('/api/entries').send({
       title: 'Test Entry',
       content: 'Test Content',
       mood: 'GREAT',
     });
     expect(createdEntry.status).toBe(201);
     const parsedEntry = entryResponseSchema.parse(createdEntry.body);
-    const response = await request(createApp()).put(`/api/entries/${parsedEntry.id}`).send({
+    const response = await request(createTestApp()).put(`/api/entries/${parsedEntry.id}`).send({
       title: 'Updated Title',
       content: 'Updated Content',
     });
@@ -380,14 +382,14 @@ describe('PUT /api/entries/:id', () => {
   });
 
   it('updates mood to new value if provided', async () => {
-    const createdEntry = await request(createApp()).post('/api/entries').send({
+    const createdEntry = await request(createTestApp()).post('/api/entries').send({
       title: 'Test Entry',
       content: 'Test Content',
       mood: 'GREAT',
     });
     expect(createdEntry.status).toBe(201);
     const parsedEntry = entryResponseSchema.parse(createdEntry.body);
-    const response = await request(createApp()).put(`/api/entries/${parsedEntry.id}`).send({
+    const response = await request(createTestApp()).put(`/api/entries/${parsedEntry.id}`).send({
       title: 'Updated Title',
       content: 'Updated Content',
       mood: 'GOOD',
@@ -398,7 +400,7 @@ describe('PUT /api/entries/:id', () => {
   });
 
   it('returns 404 not found if the ID is not found in the DB', async () => {
-    const response = await request(createApp()).put('/api/entries/123').send({
+    const response = await request(createTestApp()).put('/api/entries/123').send({
       title: 'Update Title',
       content: 'Update Content',
     });
@@ -409,7 +411,7 @@ describe('PUT /api/entries/:id', () => {
   });
 
   it('returns 400 bad request if the request body is invalid', async () => {
-    const response = await request(createApp()).put('/api/entries/123').send({
+    const response = await request(createTestApp()).put('/api/entries/123').send({
       title: '',
       content: '',
     });
@@ -420,7 +422,7 @@ describe('PUT /api/entries/:id', () => {
   });
 
   it('returns 400 bad request if the request mood is number', async () => {
-    const response = await request(createApp()).put('/api/entries/123').send({
+    const response = await request(createTestApp()).put('/api/entries/123').send({
       title: 'Test Entry',
       content: 'Test Content',
       mood: 3,
@@ -432,7 +434,7 @@ describe('PUT /api/entries/:id', () => {
   });
 
   it('returns 400 bad request if the request mood is not a valid mood', async () => {
-    const response = await request(createApp()).put('/api/entries/123').send({
+    const response = await request(createTestApp()).put('/api/entries/123').send({
       title: 'Test Entry',
       content: 'Test Content',
       mood: 'ecstatic',
@@ -444,13 +446,13 @@ describe('PUT /api/entries/:id', () => {
   });
 
   it('returns 200 OK and the original ID if trying to update the ID', async () => {
-    const createdEntry = await request(createApp()).post('/api/entries').send({
+    const createdEntry = await request(createTestApp()).post('/api/entries').send({
       title: 'Test Entry',
       content: 'Test Content',
     });
     expect(createdEntry.status).toBe(201);
     const parsedEntry = entryResponseSchema.parse(createdEntry.body);
-    const response = await request(createApp()).put(`/api/entries/${parsedEntry.id}`).send({
+    const response = await request(createTestApp()).put(`/api/entries/${parsedEntry.id}`).send({
       id: 'hacker-chosen',
       title: 'Updated Title',
       content: 'Updated Content',
@@ -505,7 +507,7 @@ describe('GET /api/moods', () => {
   });
 
   it('returns 200 ok and the moods if they exist', async () => {
-    const response = await request(createApp()).get('/api/moods');
+    const response = await request(createTestApp()).get('/api/moods');
     expect(response.status).toBe(200);
     const parsedResponse = listMoodsResponseSchema.parse(response.body);
     expect(parsedResponse.data).toHaveLength(3);
@@ -513,7 +515,7 @@ describe('GET /api/moods', () => {
   });
 
   it('returns moods between from and to dates if provided', async () => {
-    const response = await request(createApp()).get(
+    const response = await request(createTestApp()).get(
       '/api/moods?from=2026-01-01T10:00:00.000Z&to=2026-01-02T10:00:00.000Z',
     );
     expect(response.status).toBe(200);
@@ -527,7 +529,7 @@ describe('GET /api/moods', () => {
   });
 
   it('returns moods from start date if only from is provided', async () => {
-    const response = await request(createApp()).get('/api/moods?from=2026-01-01T10:00:00.000Z');
+    const response = await request(createTestApp()).get('/api/moods?from=2026-01-01T10:00:00.000Z');
     expect(response.status).toBe(200);
     const parsedResponse = listMoodsResponseSchema.parse(response.body);
     expect(parsedResponse.data).toHaveLength(3);
@@ -540,7 +542,7 @@ describe('GET /api/moods', () => {
   });
 
   it('returns moods to end date if only to is provided', async () => {
-    const response = await request(createApp()).get('/api/moods?to=2026-01-02T10:00:00.000Z');
+    const response = await request(createTestApp()).get('/api/moods?to=2026-01-02T10:00:00.000Z');
     expect(response.status).toBe(200);
     const parsedResponse = listMoodsResponseSchema.parse(response.body);
     expect(parsedResponse.data).toHaveLength(2);
@@ -552,7 +554,7 @@ describe('GET /api/moods', () => {
   });
 
   it('returns 400 bad request if from is not a valid date', async () => {
-    const response = await request(createApp()).get(
+    const response = await request(createTestApp()).get(
       '/api/moods?from=abc&to=2026-01-02T10:00:00.000Z',
     );
     expect(response.status).toBe(400);
@@ -562,7 +564,7 @@ describe('GET /api/moods', () => {
   });
 
   it('returns 400 bad request if to is not a valid date', async () => {
-    const response = await request(createApp()).get(
+    const response = await request(createTestApp()).get(
       '/api/moods?from=2026-01-01T10:00:00.000Z&to=abc',
     );
     expect(response.status).toBe(400);
@@ -572,7 +574,7 @@ describe('GET /api/moods', () => {
   });
 
   it('returns 400 bad request if from is greater than to', async () => {
-    const response = await request(createApp()).get(
+    const response = await request(createTestApp()).get(
       '/api/moods?from=2026-01-02T10:00:00.000Z&to=2026-01-01T10:00:00.000Z',
     );
     expect(response.status).toBe(400);
@@ -582,7 +584,7 @@ describe('GET /api/moods', () => {
   });
   it('returns 200 and empty array if no moods exist', async () => {
     await prisma.journalEntry.deleteMany();
-    const response = await request(createApp()).get('/api/moods');
+    const response = await request(createTestApp()).get('/api/moods');
     expect(response.status).toBe(200);
     const parsedResponse = listMoodsResponseSchema.parse(response.body);
     expect(parsedResponse.data).toHaveLength(0);
