@@ -7,12 +7,17 @@ import {
 } from './schemas/journalEntrySchemas.js';
 import { prisma } from './lib/prisma.js';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library.js';
+import type { EntrySummarizer } from './ai/entrySummarizer.js';
 
 /**
  * App factory: building the app separately from starting the server
  * lets tests exercise the real app without binding a port.
  */
-export function createApp() {
+
+export type AppDependencies = {
+  summarizer: EntrySummarizer;
+};
+export function createApp(_dependencies: AppDependencies) {
   const app = express();
   app.use(express.json());
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { createApp } from '../app.js';
+import { createTestApp } from './createTestApp.js';
 
 /**
  * Worked example (mentor-written): a Supertest integration test.
@@ -10,14 +10,14 @@ import { createApp } from '../app.js';
 
 describe('GET /api/health', () => {
   it('responds with 200 and status ok', async () => {
-    const response = await request(createApp()).get('/api/health');
+    const response = await request(createTestApp()).get('/api/health');
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ status: 'ok' });
   });
 
   it('returns 404 for unknown routes', async () => {
-    const response = await request(createApp()).get('/api/nope');
+    const response = await request(createTestApp()).get('/api/nope');
 
     expect(response.status).toBe(404);
   });
